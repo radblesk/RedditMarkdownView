@@ -17,25 +17,25 @@ public struct SnudownConfig {
     public var multilineTextAlignment: TextAlignment = .leading
     
     /// The font for default text
-    public var textFont: Font = .body
+    public var textFont: Font = .subheadline
     
     /// The font to use for h1 elements (the largest title)
-    public var headingFont: Font = .system(size: 34)
+    public var headingFont: Font = .largeTitle.bold()
     
     /// The font to use for h2 elements (second largest title)
-    public var heading2Font: Font = .system(size: 30)
+    public var heading2Font: Font = .title.bold()
     
     /// The font to use for h3 elements
-    public var heading3Font: Font = .system(size: 28)
+    public var heading3Font: Font = .title2.bold()
     
     /// The font to use for h4 elements
-    public var heading4Font: Font = .system(size: 26)
+    public var heading4Font: Font = .title3.bold()
     
     /// The font to use for h5 elements
-    public var heading5Font: Font = .system(size: 24)
+    public var heading5Font: Font = .headline.bold()
     
     /// The font to use for h6 elements (the smallest title size)
-    public var heading6Font: Font = .system(size: 20)
+    public var heading6Font: Font = .title3.bold()
     
     /// The color to apply to text
     public var textColor: Color = .primary

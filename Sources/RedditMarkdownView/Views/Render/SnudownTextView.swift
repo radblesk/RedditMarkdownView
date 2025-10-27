@@ -1,47 +1,51 @@
 //
 //  SnudownTextView.swift
-//  
+//
 //
 //  Created by Tom Knighton on 10/09/2023.
 //
 
-import SwiftUI
 import Nuke
+import SwiftUI
 
 struct SnudownTextView: View {
-    
+
     @Environment(\.snuDefaultFont) var defaultFont: Font
     @Environment(\.snuTextColour) private var textColor
     @Environment(\.snuLinkColour) private var linkColor
     @Environment(\.snuDisplayInlineImages) private var displayImages
     @Environment(\.snuInlineImageWidth) private var imageWidth
     @Environment(\.snuInlineImageShowLink) private var showInlineImageLinks
-    
+
     @State private var result: Text? = nil
 
     let node: SnuTextNode
-    
+
     private var font: Font?
-    
+
     init(node: SnuTextNode, font: Font? = nil) {
         self.node = node
         self.font = font
     }
-    
+
     var body: some View {
-            buildTextView(for: node)
-                .foregroundColor(textColor)
-                .tint(linkColor)
+        buildTextView(for: node)
+            .foregroundColor(textColor)
+            .tint(linkColor)
     }
-    
+
     private func buildTextView(for node: SnuTextNode) -> Text {
         if let link = node as? SnuLinkNode {
-            return link.contentAsCMark(loadImages: displayImages, imageWidth: imageWidth, showLink: showInlineImageLinks)
-                .font(font ?? defaultFont)
+            return link.contentAsCMark(
+                loadImages: displayImages,
+                imageWidth: imageWidth,
+                showLink: showInlineImageLinks
+            )
+            .font(font ?? defaultFont)
         }
-        
+
         let childNodes = node.children.filter { $0 is SnuTextNode }.compactMap { $0 as? SnuTextNode }
-        
+
         if childNodes.count > 0 {
             return buildChildrenTextViews(childNodes)
                 .snuTextDecoration(node.decoration, font: font ?? defaultFont)
@@ -54,17 +58,18 @@ struct SnudownTextView: View {
                 .snuTextDecoration(node.decoration, font: font ?? defaultFont)
         }
     }
-    
+
     private func buildChildrenTextViews(_ children: [SnuTextNode]) -> Text {
         return children.asyncReduce(Text("")) { (result, childNode) in
-            result + (buildTextView(for: childNode)
-                .snuTextDecoration(childNode.decoration, font: font ?? defaultFont))
+            result
+                + (buildTextView(for: childNode)
+                    .snuTextDecoration(childNode.decoration, font: font ?? defaultFont))
         }
     }
 }
 
 extension Text {
-    
+
     func snuTextDecoration(_ decoration: SnuTextNodeDecoration?, font: Font?) -> Text {
         var toReturn = self
         if let font {
@@ -84,15 +89,15 @@ extension Text {
 }
 
 extension SnuTextNode {
-    
+
     func contentAsCMark(loadImages: Bool, imageWidth: CGFloat, showLink: Bool) -> Text {
-       
+
         var result = buildAttributedString(node: self)
 
         if let link = self as? SnuLinkNode {
-            
+
             result = "[\(result)](\(link.linkHref.trimmingCharacters(in: .whitespacesAndNewlines)))"
-            
+
             if loadImages, let linkUrl = URL(string: link.linkHref.trimmingCharacters(in: .whitespacesAndNewlines)) {
                 let imageTask: Task<Text?, Never> = Task.detached(priority: .background) { [result] in
                     let request = ImageRequest(
@@ -107,10 +112,10 @@ extension SnuTextNode {
                         }
                         return returnText
                     }
-                    
+
                     return nil
                 }
-                
+
                 Task {
                     if let value = await imageTask.value {
                         return value
@@ -120,13 +125,13 @@ extension SnuTextNode {
             }
 
         }
-        
+
         return Text(LocalizedStringKey(result))
     }
-    
+
     private func buildAttributedString(node: SnuTextNode) -> String {
         var result = ""
-        
+
         for child in node.children.compactMap({ $0 as? SnuTextNode }) {
             var childAttributed = child.insideText
             childAttributed.append(buildAttributedString(node: child))
@@ -141,13 +146,13 @@ extension SnuTextNode {
                 result.append("\(childAttributed)")
             }
         }
-        
+
         return result
     }
 }
 
-public extension Sequence {
-    func asyncReduce<Result>(
+extension Sequence {
+    public func asyncReduce<Result>(
         _ initialResult: Result,
         _ nextPartialResult: ((Result, Element) throws -> Result)
     ) rethrows -> Result {
@@ -158,4 +163,3 @@ public extension Sequence {
         return result
     }
 }
-

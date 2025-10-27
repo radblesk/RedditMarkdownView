@@ -13,13 +13,13 @@ public extension EnvironmentValues {
     @Entry var snuTextAlignment: Alignment = .leading
     @Entry var snuMultilineTextAlignment: TextAlignment = .leading
     
-    @Entry var snuDefaultFont: Font = .body
-    @Entry var snuH1Font: Font = .system(size: 34)
-    @Entry var snuH2Font: Font = .system(size: 30)
-    @Entry var snuH3Font: Font = .system(size: 28)
-    @Entry var snuH4Font: Font = .system(size: 26)
-    @Entry var snuH5Font: Font = .system(size: 24)
-    @Entry var snuH6Font: Font = .system(size: 20)
+    @Entry var snuDefaultFont: Font = .subheadline
+    @Entry var snuH1Font: Font = .largeTitle.bold()
+    @Entry var snuH2Font: Font = .title.bold()
+    @Entry var snuH3Font: Font = .title2.bold()
+    @Entry var snuH4Font: Font = .title3.bold()
+    @Entry var snuH5Font: Font = .headline.bold()
+    @Entry var snuH6Font: Font = .subheadline.bold()
     
     @Entry var snuTextColour: Color = .primary
     @Entry var snuLinkColour: Color = .accentColor
