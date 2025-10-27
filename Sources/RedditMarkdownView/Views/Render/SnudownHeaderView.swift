@@ -21,6 +21,7 @@ struct SnudownHeaderView: View {
     
     var body: some View {
         text()
+            .padding(.vertical, 4)
     }
     
     @ViewBuilder

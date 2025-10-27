@@ -28,6 +28,7 @@ struct SnudownListView: View {
             }
             .padding(.leading, headingNode == nil ? 0 : 16)
         }
+        .padding(.vertical)
     }
     
     private func getItem(_ originalNode: SnuNode, index: Int) -> SnuNode {

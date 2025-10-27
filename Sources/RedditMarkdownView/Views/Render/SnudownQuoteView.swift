@@ -22,12 +22,13 @@ struct SnudownQuoteView: View {
                     .multilineTextAlignment(snuMultilineAlignment)
             }
         }
+        .foregroundStyle(Color(.systemGray))
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 20)
         .background {
             Color.accentColor
-                .opacity(0.1)
+                .opacity(0.15)
         }
         .overlay(alignment: .leading) {
             Color.accentColor

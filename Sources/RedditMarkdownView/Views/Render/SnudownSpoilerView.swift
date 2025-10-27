@@ -20,19 +20,18 @@ struct SnudownSpoilerView: View {
                 text()
             } else {
                 Text("SPOILER")
-                    .font(defaultFont)
+                    .font(.caption)
             }
         }
-        .padding(.all, 6)
+        .padding(.all, 4)
         .background {
-            Color(.systemGray).clipShape(.capsule)
-                .opacity(isOpen ? 0.4 : 1)
+            Color(isOpen ? .systemGray6 : .systemGray2).clipShape(.rect(cornerRadius: 10))
         }
         .overlay {
             if !isOpen {
                 Text("SPOILER")
                     .foregroundStyle(.white)
-                    .font(defaultFont)
+                    .font(.caption)
             }
         }
         .onTapGesture {
