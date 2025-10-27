@@ -1,6 +1,6 @@
 //
 //  File.swift
-//  
+//
 //
 //  Created by Tom Knighton on 10/09/2023.
 //
@@ -8,12 +8,12 @@
 import SwiftUI
 
 struct SnudownSpoilerView: View {
-    
+
     @Environment(\.snuDefaultFont) var defaultFont: Font
     @State private var isOpen: Bool = false
 
     let node: SnuSpoilerNode
-    
+
     var body: some View {
         Group {
             if isOpen {
@@ -23,9 +23,9 @@ struct SnudownSpoilerView: View {
                     .font(defaultFont)
             }
         }
-        .padding(.all, 2)
+        .padding(.all, 6)
         .background {
-            Color.black.clipShape(.rect(cornerRadius: 10))
+            Color(.systemGray).clipShape(.capsule)
                 .opacity(isOpen ? 0.4 : 1)
         }
         .overlay {
@@ -41,7 +41,7 @@ struct SnudownSpoilerView: View {
             }
         }
     }
-    
+
     @ViewBuilder
     func text() -> some View {
         let children = node.children.filter { $0 is SnuTextNode }.compactMap { $0 as? SnuTextNode }
@@ -53,4 +53,16 @@ struct SnudownSpoilerView: View {
                 .font(defaultFont)
         }
     }
+}
+
+#Preview {
+    SnudownSpoilerView(
+        node: SnuSpoilerNode(
+            insideText: "This is hidden spoiler content that will be revealed when tapped",
+            children: [
+                SnuTextNode(insideText: "Secret information here!", children: [])
+            ]
+        )
+    )
+    .padding()
 }
