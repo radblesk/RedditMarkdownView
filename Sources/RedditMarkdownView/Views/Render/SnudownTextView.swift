@@ -29,28 +29,21 @@ struct SnudownTextView: View {
     }
     
     var body: some View {
-        if let result {
-            result
+            buildTextView(for: node)
                 .foregroundColor(textColor)
                 .tint(linkColor)
-        } else {
-            ProgressView()
-                .task {
-                    self.result = await buildTextView(for: node)
-                }
-        }
     }
     
-    private func buildTextView(for node: SnuTextNode) async -> Text {
+    private func buildTextView(for node: SnuTextNode) -> Text {
         if let link = node as? SnuLinkNode {
-            return await link.contentAsCMark(loadImages: displayImages, imageWidth: imageWidth, showLink: showInlineImageLinks)
+            return link.contentAsCMark(loadImages: displayImages, imageWidth: imageWidth, showLink: showInlineImageLinks)
                 .font(font ?? defaultFont)
         }
         
         let childNodes = node.children.filter { $0 is SnuTextNode }.compactMap { $0 as? SnuTextNode }
         
         if childNodes.count > 0 {
-            return await buildChildrenTextViews(childNodes)
+            return buildChildrenTextViews(childNodes)
                 .snuTextDecoration(node.decoration, font: font ?? defaultFont)
         } else {
             var textToDisplay = node.insideText
@@ -62,9 +55,9 @@ struct SnudownTextView: View {
         }
     }
     
-    private func buildChildrenTextViews(_ children: [SnuTextNode]) async -> Text {
-        return await children.asyncReduce(Text("")) { (result, childNode) in
-            result + (await buildTextView(for: childNode)
+    private func buildChildrenTextViews(_ children: [SnuTextNode]) -> Text {
+        return children.asyncReduce(Text("")) { (result, childNode) in
+            result + (buildTextView(for: childNode)
                 .snuTextDecoration(childNode.decoration, font: font ?? defaultFont))
         }
     }
@@ -92,7 +85,7 @@ extension Text {
 
 extension SnuTextNode {
     
-    func contentAsCMark(loadImages: Bool, imageWidth: CGFloat, showLink: Bool) async -> Text {
+    func contentAsCMark(loadImages: Bool, imageWidth: CGFloat, showLink: Bool) -> Text {
        
         var result = buildAttributedString(node: self)
 
@@ -118,8 +111,11 @@ extension SnuTextNode {
                     return nil
                 }
                 
-                if let value = await imageTask.value {
-                    return value
+                Task {
+                    if let value = await imageTask.value {
+                        return value
+                    }
+                    return Text("")
                 }
             }
 
@@ -153,11 +149,11 @@ extension SnuTextNode {
 public extension Sequence {
     func asyncReduce<Result>(
         _ initialResult: Result,
-        _ nextPartialResult: ((Result, Element) async throws -> Result)
-    ) async rethrows -> Result {
+        _ nextPartialResult: ((Result, Element) throws -> Result)
+    ) rethrows -> Result {
         var result = initialResult
         for element in self {
-            result = try await nextPartialResult(result, element)
+            result = try nextPartialResult(result, element)
         }
         return result
     }
