@@ -14,7 +14,7 @@ struct SnudownExtractor {
         
         do {
             let doc = try SwiftSoup.parseBodyFragment(snudown)
-            doc.outputSettings(OutputSettings().prettyPrint(pretty: false))
+            doc.outputSettings(OutputSettings().prettyPrint(pretty: true))
             guard let body = doc.body() else {
                 return []
             }
