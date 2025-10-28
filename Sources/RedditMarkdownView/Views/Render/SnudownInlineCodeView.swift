@@ -9,7 +9,7 @@ struct SnudownInlineCodeView: View {
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(
-                Capsule(style: .continuous)
+                RoundedRectangle(cornerRadius: 8)
                     .fill(Color(.systemGray5))
             )
     }
