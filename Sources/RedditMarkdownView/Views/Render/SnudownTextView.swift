@@ -207,8 +207,12 @@ struct InlineRemoteImageView: View {
                                 }
                             }
                     )
+
+                if showLink {
+                    Text(LocalizedStringKey(linkText))
+                }
             }
-            if showLink {
+            if uiImage == nil {
                 Text(LocalizedStringKey(linkText))
             }
         }
