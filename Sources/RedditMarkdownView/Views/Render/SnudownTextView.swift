@@ -185,7 +185,7 @@ struct InlineRemoteImageView: View {
 
     @State private var uiImage: UIImage? = nil
 
-    @State private var isPresenting: Bool = true
+    @State private var isPresenting: Bool = false
     @Namespace var zoomNamespace
 
     var body: some View {
