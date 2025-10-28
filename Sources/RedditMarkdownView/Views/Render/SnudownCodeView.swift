@@ -17,12 +17,6 @@ struct SnudownCodeView: View {
     private let highlightr = Highlightr()
 
     @State private var attributedCode: NSAttributedString? = nil
-    @State private var copied: Bool = false
-
-    // Determine if this is a code block (multi-line) or inline code (single-line)
-    private var isCodeBlock: Bool {
-        code.insideText.contains("\n")
-    }
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -31,7 +25,7 @@ struct SnudownCodeView: View {
 //                    Text(AttributedString(attributedCode))
 //                } else {
                     Text(code.insideText.trimmingCharacters(in: .whitespacesAndNewlines))
-                    .font(.footnote.monospaced())
+                    .font(.subheadline.monospaced())
 //                }
             }
             .lineSpacing(5)
@@ -39,6 +33,7 @@ struct SnudownCodeView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(Color(.systemGray6), in: .rect(cornerRadius: 8))
+        .padding(.vertical)
 //        .task(priority: .background) {
 //            var text = self.code.insideText.trimmingCharacters(in: .whitespacesAndNewlines)
 //            var language: String? = nil

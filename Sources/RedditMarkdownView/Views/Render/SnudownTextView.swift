@@ -7,6 +7,8 @@
 
 import Nuke
 import SwiftUI
+import UIKit
+import Zoomable
 
 struct SnudownTextView: View {
 
@@ -16,8 +18,6 @@ struct SnudownTextView: View {
     @Environment(\.snuDisplayInlineImages) private var displayImages
     @Environment(\.snuInlineImageWidth) private var imageWidth
     @Environment(\.snuInlineImageShowLink) private var showInlineImageLinks
-
-    @State private var result: Text? = nil
 
     let node: SnuTextNode
 
@@ -29,41 +29,96 @@ struct SnudownTextView: View {
     }
 
     var body: some View {
-        buildTextView(for: node)
+        buildView(for: node)
             .foregroundColor(textColor)
             .tint(linkColor)
     }
 
-    private func buildTextView(for node: SnuTextNode) -> Text {
+    private func buildView(for node: SnuTextNode) -> AnyView {
         if let link = node as? SnuLinkNode {
-            return link.contentAsCMark(
-                loadImages: displayImages,
-                imageWidth: imageWidth,
-                showLink: showInlineImageLinks
-            )
-            .font(font ?? defaultFont)
+            let linkHref = link.linkHref.trimmingCharacters(in: .whitespacesAndNewlines)
+            if displayImages, URL(string: linkHref) != nil {
+                return AnyView(
+                    InlineRemoteImageView(
+                        urlString: linkHref,
+                        imageWidth: imageWidth,
+                        showLink: showInlineImageLinks,
+                        linkText: link.contentAsCMarkString()
+                    )
+                    .font(font ?? defaultFont)
+                )
+            } else {
+                return AnyView(
+                    Text(link.contentAsCMarkString())
+                        .font(font ?? defaultFont)
+                )
+            }
         }
 
         let childNodes = node.children.filter { $0 is SnuTextNode }.compactMap { $0 as? SnuTextNode }
 
         if childNodes.count > 0 {
-            return buildChildrenTextViews(childNodes)
-                .snuTextDecoration(node.decoration, font: font ?? defaultFont)
+            return AnyView(buildChildrenViews(childNodes))
         } else {
-            var textToDisplay = node.insideText
-            if textToDisplay.hasSuffix("\n") {
-                textToDisplay = String(textToDisplay.dropLast())
-            }
-            return Text(textToDisplay)
-                .snuTextDecoration(node.decoration, font: font ?? defaultFont)
+            return AnyView(
+                buildTextOnly(for: node)
+                    .snuTextDecoration(node.decoration, font: font ?? defaultFont)
+            )
         }
     }
 
-    private func buildChildrenTextViews(_ children: [SnuTextNode]) -> Text {
-        return children.asyncReduce(Text("")) { (result, childNode) in
-            result
-                + (buildTextView(for: childNode)
-                    .snuTextDecoration(childNode.decoration, font: font ?? defaultFont))
+    private func buildTextOnly(for node: SnuTextNode) -> Text {
+        var textToDisplay = node.insideText
+        if textToDisplay.hasSuffix("\n") {
+            textToDisplay = String(textToDisplay.dropLast())
+        }
+        return Text(textToDisplay)
+            .font(font ?? defaultFont)
+    }
+
+    private func buildChildrenViews(_ children: [SnuTextNode]) -> some View {
+        var views: [AnyView] = []
+        var currentText = Text("")
+        var hasAccumulatedText = false
+
+        func flushText() {
+            if hasAccumulatedText {
+                views.append(AnyView(currentText))
+                currentText = Text("")
+                hasAccumulatedText = false
+            }
+        }
+
+        for child in children {
+            if let link = child as? SnuLinkNode {
+                flushText()
+                let linkHref = link.linkHref.trimmingCharacters(in: .whitespacesAndNewlines)
+                if displayImages, URL(string: linkHref) != nil {
+                    let view = InlineRemoteImageView(
+                        urlString: linkHref,
+                        imageWidth: imageWidth,
+                        showLink: showInlineImageLinks,
+                        linkText: link.contentAsCMarkString()
+                    )
+                    views.append(AnyView(view))
+                } else {
+                    let linkText = Text(link.contentAsCMarkString()).font(font ?? defaultFont)
+                    views.append(AnyView(linkText))
+                }
+            } else {
+                let piece = buildTextOnly(for: child)
+                    .snuTextDecoration(child.decoration, font: font ?? defaultFont)
+                currentText = hasAccumulatedText ? (currentText + piece) : piece
+                hasAccumulatedText = true
+            }
+        }
+
+        flushText()
+
+        return VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(views.indices), id: \.self) { idx in
+                views[idx]
+            }
         }
     }
 }
@@ -90,43 +145,14 @@ extension Text {
 
 extension SnuTextNode {
 
-    func contentAsCMark(loadImages: Bool, imageWidth: CGFloat, showLink: Bool) -> Text {
-
+    func contentAsCMarkString() -> String {
         var result = buildAttributedString(node: self)
 
         if let link = self as? SnuLinkNode {
-
             result = "[\(result)](\(link.linkHref.trimmingCharacters(in: .whitespacesAndNewlines)))"
-
-            if loadImages, let linkUrl = URL(string: link.linkHref.trimmingCharacters(in: .whitespacesAndNewlines)) {
-                let imageTask: Task<Text?, Never> = Task.detached(priority: .background) { [result] in
-                    let request = ImageRequest(
-                        url: linkUrl,
-                        processors: [.resize(width: imageWidth)]
-                    )
-                    let imageTask = try? await ImagePipeline.shared.image(for: request)
-                    if let cgImage = await imageTask?.byPreparingForDisplay() {
-                        var returnText = Text(Image(uiImage: cgImage).resizable())
-                        if showLink {
-                            returnText = returnText + Text("\n") + Text(LocalizedStringKey(result))
-                        }
-                        return returnText
-                    }
-
-                    return nil
-                }
-
-                Task {
-                    if let value = await imageTask.value {
-                        return value
-                    }
-                    return Text("")
-                }
-            }
-
         }
 
-        return Text(LocalizedStringKey(result))
+        return result
     }
 
     private func buildAttributedString(node: SnuTextNode) -> String {
@@ -151,16 +177,91 @@ extension SnuTextNode {
     }
 }
 
-extension Sequence {
-    public func asyncReduce<Result>(
-        _ initialResult: Result,
-        _ nextPartialResult: ((Result, Element) throws -> Result)
-    ) rethrows -> Result {
-        var result = initialResult
-        for element in self {
-            result = try nextPartialResult(result, element)
+struct InlineRemoteImageView: View {
+    let urlString: String
+    let imageWidth: CGFloat
+    let showLink: Bool
+    let linkText: String
+
+    @State private var uiImage: UIImage? = nil
+
+    @State private var isPresenting: Bool = false
+    @Namespace var zoomNamespace
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if let uiImage {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxHeight: 300)
+                    .clipShape(.rect(cornerRadius: 15, style: .continuous))
+                    .clipped()
+                    .contentShape(.rect)
+                    .matchedTransitionSource(id: "image", in: zoomNamespace)
+                    .highPriorityGesture(
+                        TapGesture()
+                            .onEnded {
+                                withAnimation {
+                                    isPresenting = true
+                                }
+                            }
+                    )
+            }
+            if showLink {
+                Text(LocalizedStringKey(linkText))
+            }
         }
-        return result
+        .task(id: urlString) {
+            await loadImage()
+        }
+        .fullScreenCover(isPresented: $isPresenting) {
+            ZStack {
+                Color.black
+                if let uiImage {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .scaledToFit()
+                        .zoomable()
+                }
+            }
+            .ignoresSafeArea()
+
+            .overlay {
+                HStack {
+                    Button {
+                        withAnimation {
+                            isPresenting = false
+                        }
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 30, height: 30)
+                            .foregroundStyle(.ultraThinMaterial)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                .padding()
+            }
+            .navigationTransition(.zoom(sourceID: "image", in: zoomNamespace))
+        }
+    }
+
+    @MainActor
+    private func setImage(_ image: UIImage?) {
+        self.uiImage = image
+    }
+
+    private func loadImage() async {
+        guard let url = URL(string: urlString) else { return }
+        let request = ImageRequest(url: url)
+        do {
+            let image: UIImage = try await ImagePipeline.shared.image(for: request)
+            setImage(image)
+        } catch {
+            // Ignore errors; fallback is to show link text only
+        }
     }
 }
 
@@ -174,19 +275,15 @@ extension Sequence {
         ### Plain Text
         Upgraded from a 2014 intel MacBook Pro that sounds like a jet engine when web browsing and a battery that lasted 90 minutes. Holy cow, what a quantum leap these machines have come.
 
-        ### Text Styles
-        This is **bold text**
-        This is *italic text*
-        This is ***bold italic text***
-        This is ~~Strikethrough text~~
-        This is a ^(superscript)
-
         ### Link with Title
         [Some Link](https://www.radobley.com)
 
         ### Code
         `This is inline code`
 
+        ```
+        import SwiftUI\nstruct Snudown: View {\nvar body: some View {\n// code goes here\n}\n}
+        ```
 
         ### Spoiler
         This is a >!spoiler content which should be hidden!<
@@ -206,8 +303,9 @@ extension Sequence {
         * Item 2
         * Item 3
         """
-
     ScrollView {
         SnudownView(text: exampleMarkdown)
     }
+    .padding(.horizontal, 8)
+    .background { Color(uiColor: .tertiarySystemBackground).ignoresSafeArea() }
 }

@@ -13,6 +13,8 @@ struct SnudownSpoilerView: View {
     @State private var isOpen: Bool = false
 
     let node: SnuSpoilerNode
+    
+    @Namespace var transition
 
     var body: some View {
         Group {
@@ -20,22 +22,18 @@ struct SnudownSpoilerView: View {
                 text()
             } else {
                 Text("SPOILER")
-                    .font(.caption)
-            }
-        }
-        .padding(.all, 4)
-        .background {
-            Color(isOpen ? .systemGray6 : .systemGray2).clipShape(.rect(cornerRadius: 10))
-        }
-        .overlay {
-            if !isOpen {
-                Text("SPOILER")
+                    .font(.subheadline)
                     .foregroundStyle(.white)
-                    .font(.caption)
             }
         }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background {
+            Color(isOpen ? .systemGray6 : .systemGray2).clipShape(.rect(cornerRadius: 8))
+        }
+        .matchedGeometryEffect(id: "spoiler", in: transition, anchor: .leading)
         .onTapGesture {
-            withAnimation(.easeInOut(duration: 0.3)) {
+            withAnimation {
                 isOpen.toggle()
             }
         }

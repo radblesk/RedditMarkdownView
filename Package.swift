@@ -6,7 +6,7 @@ import PackageDescription
 let package = Package(
     name: "RedditMarkdownView",
     platforms: [
-        .iOS(.v16),
+        .iOS("18.0"),
         .macOS(.v13),
         .watchOS(.v9),
         .visionOS(.v1)
@@ -20,7 +20,8 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/scinfu/SwiftSoup", from: "2.6.1"),
         .package(url: "https://github.com/raspu/Highlightr", from: "2.3.0"),
-        .package(url: "https://github.com/kean/Nuke", from: "12.1.6")
+        .package(url: "https://github.com/kean/Nuke", from: "12.1.6"),
+        .package(url: "https://github.com/ryohey/Zoomable.git", branch: "main")
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -28,7 +29,7 @@ let package = Package(
         .target(name: "snudown"),
         .target(
             name: "RedditMarkdownView",
-            dependencies: ["snudown", "SwiftSoup", "Highlightr", "Nuke"]
+            dependencies: ["snudown", "SwiftSoup", "Highlightr", "Nuke", "Zoomable"]
         ),
         .testTarget(
             name: "RedditMarkdownViewTests",
