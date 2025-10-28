@@ -185,7 +185,7 @@ struct InlineRemoteImageView: View {
 
     @State private var uiImage: UIImage? = nil
 
-    @State private var isPresenting: Bool = false
+    @State private var isPresenting: Bool = true
     @Namespace var zoomNamespace
 
     var body: some View {
@@ -234,12 +234,13 @@ struct InlineRemoteImageView: View {
                             isPresenting = false
                         }
                     } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 30, height: 30)
-                            .foregroundStyle(.ultraThinMaterial)
+                        Image(systemName: "xmark")
+                            .padding(12)
+                            .foregroundStyle(.secondary)
+                            .clipShape(.circle)
                     }
+                    .buttonStyle(.plain)
+                    .glassEffect(.regular.interactive(), in: .circle)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                 .padding()

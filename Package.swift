@@ -6,7 +6,7 @@ import PackageDescription
 let package = Package(
     name: "RedditMarkdownView",
     platforms: [
-        .iOS("18.0"),
+        .iOS("26.0"),
         .macOS(.v13),
         .watchOS(.v9),
         .visionOS(.v1)
