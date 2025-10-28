@@ -18,8 +18,8 @@ let package = Package(
             targets: ["RedditMarkdownView"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/scinfu/SwiftSoup", exact: "2.6.1"),
-        .package(url: "https://github.com/raspu/Highlightr", exact: "2.1.2"),
+        .package(url: "https://github.com/scinfu/SwiftSoup", from: "2.6.1"),
+        .package(url: "https://github.com/raspu/Highlightr", from: "2.3.0"),
         .package(url: "https://github.com/kean/Nuke", from: "12.1.6")
     ],
     targets: [
