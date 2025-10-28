@@ -30,7 +30,7 @@ struct SnudownCodeView: View {
                 if let attributedCode {
                     Text(AttributedString(attributedCode))
                 } else {
-                    Text(code.insideText)
+                    Text(code.insideText.trimmingCharacters(in: .whitespacesAndNewlines))
                 }
             }
             .lineSpacing(5)
@@ -39,27 +39,25 @@ struct SnudownCodeView: View {
         }
         .background(Color(.systemGray6), in: .rect(cornerRadius: 8))
         .task(priority: .background) {
-            var text = self.code.insideText
+            var text = self.code.insideText.trimmingCharacters(in: .whitespacesAndNewlines)
             var language: String? = nil
 
             // Only try to detect language for code blocks, not inline code
-            if isCodeBlock {
-                let lines = self.code.insideText.split(separator: "\n", omittingEmptySubsequences: false)
+            let lines = self.code.insideText.split(separator: "\n", omittingEmptySubsequences: false)
 
-                // Check if first non-empty line is a language identifier
-                if let firstNonEmptyLine = lines.first(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty }) {
-                    let potentialLanguage = firstNonEmptyLine.trimmingCharacters(in: .whitespaces).lowercased()
+            // Check if first non-empty line is a language identifier
+            if let firstNonEmptyLine = lines.first(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty }) {
+                let potentialLanguage = firstNonEmptyLine.trimmingCharacters(in: .whitespaces).lowercased()
 
-                    if let supportedLanguage = highlightr?.supportedLanguages().first(where: { $0 == potentialLanguage }
-                    ) {
-                        language = supportedLanguage
+                if let supportedLanguage = highlightr?.supportedLanguages().first(where: { $0 == potentialLanguage }
+                ) {
+                    language = supportedLanguage
 
-                        // Find the index of the language line and drop everything up to and including it
-                        if let langIndex = lines.firstIndex(where: {
-                            $0.trimmingCharacters(in: .whitespaces).lowercased() == potentialLanguage
-                        }) {
-                            text = lines.dropFirst(langIndex + 1).joined(separator: "\n")
-                        }
+                    // Find the index of the language line and drop everything up to and including it
+                    if let langIndex = lines.firstIndex(where: {
+                        $0.trimmingCharacters(in: .whitespaces).lowercased() == potentialLanguage
+                    }) {
+                        text = lines.dropFirst(langIndex + 1).joined(separator: "\n")
                     }
                 }
             }
@@ -79,15 +77,17 @@ struct SnudownCodeView: View {
             SnudownView(
                 text: """
                     This is a
+
                     ```
                     import inlineCode
-                    
+
                     struct Snu: View {
                         var body: some View {
                             /// code here
                             }
                     }
                     ```
+
                     And this is `inline code`
                     """
             )

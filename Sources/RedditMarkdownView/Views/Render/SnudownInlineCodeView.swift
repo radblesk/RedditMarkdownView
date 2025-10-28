@@ -5,12 +5,12 @@ struct SnudownInlineCodeView: View {
 
     var body: some View {
         Text(code.insideText)
-            .font(.system(.body, design: .monospaced))
+            .font(.system(.subheadline, design: .monospaced))
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(
                 Capsule(style: .continuous)
-                    .fill(Color(.systemGray6))
+                    .fill(Color(.systemGray5))
             )
     }
 }

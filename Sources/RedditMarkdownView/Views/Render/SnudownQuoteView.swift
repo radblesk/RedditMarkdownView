@@ -1,6 +1,6 @@
 //
 //  File.swift
-//  
+//
 //
 //  Created by Tom Knighton on 10/09/2023.
 //
@@ -8,12 +8,12 @@
 import SwiftUI
 
 struct SnudownQuoteView: View {
-    
+
     @Environment(\.snuTextAlignment) var textAlignment: Alignment
     @Environment(\.snuMultilineTextAlignment) var snuMultilineAlignment: TextAlignment
-    
+
     let quote: SnuQuoteBlockNode
-    
+
     var body: some View {
         VStack {
             ForEach(quote.children, id: \.id) { child in
@@ -22,18 +22,24 @@ struct SnudownQuoteView: View {
                     .multilineTextAlignment(snuMultilineAlignment)
             }
         }
-        .foregroundStyle(Color(.systemGray))
+        .opacity(0.65)
+        .italic()
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 20)
-        .background {
-            Color.accentColor
-                .opacity(0.15)
-        }
         .overlay(alignment: .leading) {
-            Color.accentColor
+            Color(.systemGray)
                 .frame(width: 4)
         }
-        .cornerRadius(3)
     }
+}
+
+#Preview {
+    SnudownView(
+        text: """
+            >This is a quoted text
+
+            With normal text underneath
+            """
+    )
 }
