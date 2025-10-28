@@ -19,11 +19,6 @@ struct SnudownParser {
         let result = snudown.markdownTest(markdown_p0)
         let resultString = String(validatingUTF8: result!)
         
-        print(markdown_p0!)
-        print("=== RAW SNUDOWN HTML ===")
-        print(resultString ?? "nil")
-        print("========================")
-        
         let paragraphs = snudownToNodes(resultString ?? "")
         result?.deallocate()
         return paragraphs
