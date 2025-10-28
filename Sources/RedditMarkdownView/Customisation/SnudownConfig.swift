@@ -17,7 +17,7 @@ public struct SnudownConfig {
     public var multilineTextAlignment: TextAlignment = .leading
     
     /// The font for default text
-    public var textFont: Font = .subheadline
+    public var textFont: Font = .callout
     
     /// The font to use for h1 elements (the largest title)
     public var headingFont: Font = .title.bold()

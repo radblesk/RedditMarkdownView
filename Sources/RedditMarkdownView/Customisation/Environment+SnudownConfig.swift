@@ -13,7 +13,7 @@ public extension EnvironmentValues {
     @Entry var snuTextAlignment: Alignment = .leading
     @Entry var snuMultilineTextAlignment: TextAlignment = .leading
     
-    @Entry var snuDefaultFont: Font = .subheadline
+    @Entry var snuDefaultFont: Font = .callout
     @Entry var snuH1Font: Font = .title.bold()
     @Entry var snuH2Font: Font = .title2.bold()
     @Entry var snuH3Font: Font = .title3.bold()
