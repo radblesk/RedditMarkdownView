@@ -22,3 +22,12 @@ class SnuNode: Identifiable {
         self.children = children
     }
 }
+
+extension SnuNode {
+    var isEmpty: Bool {
+        if let textNode = self as? SnuTextNode {
+            return textNode.insideText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && (textNode.children.isEmpty)
+        }
+        return false
+    }
+}

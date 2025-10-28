@@ -25,10 +25,16 @@ struct SnudownRenderer: View {
     
     @ViewBuilder
     func renderParagraph(_ p: SnuParagprah) -> some View {
-        WrappingHStack(alignment: textAlign, horizontalSpacing: 0, verticalSpacing: 8) {
-            ForEach(p.collectedNodes) { child in
-                SnudownRenderSwitch(node: child)
-                    .fixedSize(horizontal: false, vertical: true)
+        if p.collectedNodes.isEmpty || p.collectedNodes.allSatisfy({ $0.isEmpty }) {
+            // Empty paragraph - render as a spacer to preserve the empty line
+            Spacer()
+                .frame(height: 8)
+        } else {
+            WrappingHStack(alignment: textAlign, horizontalSpacing: 0, verticalSpacing: 8) {
+                ForEach(p.collectedNodes) { child in
+                    SnudownRenderSwitch(node: child)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
     }
@@ -40,29 +46,28 @@ struct SnudownRenderSwitch: View {
     
     let node: SnuNode
     
-    var body: some View {   
-        if let node = node as? SnuSpoilerNode {
-            SnudownSpoilerView(node: node)
+    var body: some View {
+        Group {
+            if let node = node as? SnuSpoilerNode {
+                SnudownSpoilerView(node: node)
+            } else if let node = node as? SnuHeaderNode {
+                SnudownHeaderView(node: node)
+            } else if let node = node as? SnuTableNode, !hideTables {
+                SnudownTableView(table: node)
+            } else if let node = node as? SnuQuoteBlockNode {
+                SnudownQuoteView(quote: node)
+            } else if let node = node as? SnuListNode {
+                SnudownListView(list: node, headingNode: node.headerNode)
+            } else if let node = node as? SnuCodeBlock {
+                SnudownCodeView(code: node)
+            } else if let node = node as? SnuInlineCode {
+                SnudownInlineCodeView(code: node)
+            } else if let node = node as? SnuTextNode {
+                SnudownTextView(node: node)
+            } else {
+                EmptyView()
+            }
         }
-        if let node = node as? SnuHeaderNode {
-            SnudownHeaderView(node: node)
-        }
-        if let node = node as? SnuTableNode, !hideTables {
-            SnudownTableView(table: node)
-        }
-        if let node = node as? SnuQuoteBlockNode {
-            SnudownQuoteView(quote: node)
-        }
-        if let node = node as? SnuListNode {
-            SnudownListView(list: node, headingNode: node.headerNode)
-        }
-        if let node = node as? SnuCodeBlock {
-            SnudownCodeView(code: node)
-        }
-        if let node = node as? SnuTextNode {
-            SnudownTextView(node: node)
-        }
-        
     }
 }
 
@@ -91,3 +96,4 @@ extension SnuParagprah {
         return nodes
     }
 }
+

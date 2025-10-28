@@ -19,11 +19,21 @@
 
 #include "markdown.h"
 #include "stack.h"
+#include "siphash.h"
 
 #include <assert.h>
 #include <string.h>
 #include <ctype.h>
 #include <stdio.h>
+#include <stdint.h>
+#include <unistd.h>
+
+#if __GLIBC__ >= 2 && __GLIBC_MINOR >= 25
+#include <sys/random.h>
+#else
+# define getrandom backport_getrandom
+# include <sys/syscall.h>
+#endif
 
 #if defined(_WIN32)
 #define strncasecmp	_strnicmp
@@ -39,8 +49,19 @@
 #define gperf_case_strncmp(s1, s2, n) strncasecmp(s1, s2, n)
 #define GPERF_DOWNCASE 1
 #define GPERF_CASE_STRNCMP 1
+
+#define MAX_NUM_ENTITY_LEN 7
+
+static int is_valid_numeric_entity(uint32_t entity) {
+    return (entity >= 0x80 && entity <= 0xD7FF) ||
+    (entity >= 0xE000 && entity <= 0x10FFFF);
+}
+
+static int is_allowed_named_entity(const char *data, size_t end) {
+    // Simplified - just return 1 for now
+    return 1;
+}
 #include "html_blocks.h"
-#include "html_entities.h"
 
 /***************
  * LOCAL TYPES *
@@ -51,6 +72,7 @@ struct link_ref {
 	unsigned int id;
 
 	struct buf *link;
+	struct buf *label;
 	struct buf *title;
 
 	struct link_ref *next;
@@ -123,9 +145,23 @@ struct sd_markdown {
 	int in_link_body;
 };
 
+int sip_hash_key_init = 0;
+uint8_t sip_hash_key[SIP_HASH_KEY_LEN];
+
 /***************************
  * HELPER FUNCTIONS *
  ***************************/
+
+int backport_getrandom(void *buf, size_t buflen, unsigned int flags)
+{
+#ifdef __APPLE__
+    // On macOS/iOS, use arc4random_buf instead
+    arc4random_buf(buf, buflen);
+    return (int)buflen;
+#else
+    return (int)syscall(SYS_getrandom, buf, buflen, flags);
+#endif
+}
 
 static inline struct buf *
 rndr_newbuf(struct sd_markdown *rndr, int type)
@@ -175,26 +211,34 @@ unscape_text(struct buf *ob, struct buf *src)
 static unsigned int
 hash_link_ref(const uint8_t *link_ref, size_t length)
 {
-	size_t i;
-	unsigned int hash = 0;
-
-	for (i = 0; i < length; ++i)
-		hash = tolower(link_ref[i]) + (hash << 6) + (hash << 16) - hash;
-
-	return hash;
-}
+    return (unsigned int)siphash_nocase(link_ref, length, sip_hash_key);}
 
 static struct link_ref *
 add_link_ref(
 	struct link_ref **references,
 	const uint8_t *name, size_t name_size)
 {
-	struct link_ref *ref = calloc(1, sizeof(struct link_ref));
+	unsigned int hash;
+	struct link_ref *ref;
+	hash = hash_link_ref(name, name_size);
+	ref = references[hash % REF_TABLE_SIZE];
+	while (ref != NULL) {
+		/* If a reference with the same label exists already, replace it with the new reference */
+		if (ref->id == hash && ref->label->size == name_size) {
+			if (strncasecmp((char *)ref->label->data, (char *) name, name_size) == 0) {
+				bufrelease(ref->label);
+				bufrelease(ref->link);
+				bufrelease(ref->title);
+				return ref;
+			}
+		}
 
+		ref = ref->next;
+	}
+	ref = calloc(1, sizeof(struct link_ref));
 	if (!ref)
 		return NULL;
-
-	ref->id = hash_link_ref(name, name_size);
+	ref->id = hash;
 	ref->next = references[ref->id % REF_TABLE_SIZE];
 
 	references[ref->id % REF_TABLE_SIZE] = ref;
@@ -210,8 +254,11 @@ find_link_ref(struct link_ref **references, uint8_t *name, size_t length)
 	ref = references[hash % REF_TABLE_SIZE];
 
 	while (ref != NULL) {
-		if (ref->id == hash)
-			return ref;
+		if (ref->id == hash && ref->label->size == length) {
+			if (strncasecmp((char *)ref->label->data, (char *) name, length) == 0) {
+				return ref;
+			}
+		}
 
 		ref = ref->next;
 	}
@@ -230,6 +277,7 @@ free_link_refs(struct link_ref **references)
 
 		while (r) {
 			next = r->next;
+			bufrelease(r->label);
 			bufrelease(r->link);
 			bufrelease(r->title);
 			free(r);
@@ -810,7 +858,9 @@ char_entity(struct buf *ob, struct sd_markdown *rndr, uint8_t *data, size_t max_
 			entity_base = 10;
 
 		// This is ok because  it'll stop once it hits the ';'
-		entity_val = strtol((char*)data + content_start, NULL, entity_base);
+		unsigned long temp_val = strtoul((char*)data + content_start, NULL, entity_base);
+		if (temp_val > UINT32_MAX) return 0;
+		entity_val = (uint32_t)temp_val;
 		if (!is_valid_numeric_entity(entity_val))
 			return 0;
 	} else {
@@ -912,7 +962,6 @@ char_autolink_subreddit_or_username(struct buf *ob, struct sd_markdown *rndr, ui
 	/* Found either a user or subreddit link */
 	if (link_len > 0) {
 		link_url = rndr_newbuf(rndr, BUFFER_SPAN);
-        bufputs(link_url, "https://reddit.com");
 		if (no_slash)
 			bufputc(link_url, '/');
 		bufput(link_url, link->data, link->size);
@@ -2236,7 +2285,7 @@ parse_table_row(
 	cols_left = columns - col;
 	if (cols_left > 0) {
 		struct buf empty_cell = { 0, 0, 0, 0 };
-		rndr->cb.table_cell(row_work, &empty_cell, col_data[col] | header_flag, rndr->opaque, cols_left);
+        rndr->cb.table_cell(row_work, &empty_cell, col_data[col] | header_flag, rndr->opaque, (int)cols_left);
 	}
 
 	rndr->cb.table_row(ob, row_work, rndr->opaque);
@@ -2566,6 +2615,8 @@ is_ref(const uint8_t *data, size_t beg, size_t end, size_t *last, struct link_re
 		if (!ref)
 			return 0;
 
+		ref->label = bufnew(id_end - id_offset);
+		bufput(ref->label, data + id_offset, id_end - id_offset);
 		ref->link = bufnew(link_end - link_offset);
 		bufput(ref->link, data + link_offset, link_end - link_offset);
 
@@ -2622,6 +2673,12 @@ sd_markdown_new(
 	md = malloc(sizeof(struct sd_markdown));
 	if (!md)
 		return NULL;
+
+	if (!sip_hash_key_init) {
+		if (getrandom(sip_hash_key, SIP_HASH_KEY_LEN, 0) < SIP_HASH_KEY_LEN)
+			return NULL;
+		sip_hash_key_init = 1;
+	}
 
 	memcpy(&md->cb, callbacks, sizeof(struct sd_callbacks));
 

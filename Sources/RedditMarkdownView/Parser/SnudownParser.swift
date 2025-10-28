@@ -17,7 +17,12 @@ struct SnudownParser {
         snudown.init_renderers()
         let markdown_p0 = UnsafeMutablePointer<CChar>(mutating: (text as NSString).utf8String)
         let result = snudown.markdownTest(markdown_p0)
-        let resultString = String(validatingUTF8: snudown.markdownTest(markdown_p0))
+        let resultString = String(validatingUTF8: result!)
+        
+        print(markdown_p0!)
+        print("=== RAW SNUDOWN HTML ===")
+        print(resultString ?? "nil")
+        print("========================")
         
         let paragraphs = snudownToNodes(resultString ?? "")
         result?.deallocate()

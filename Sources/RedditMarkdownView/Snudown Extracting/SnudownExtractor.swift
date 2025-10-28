@@ -22,16 +22,42 @@ struct SnudownExtractor {
             let rawParagraphs = body.getChildNodes()
             
             var paragraphs: [SnuParagprah] = []
-            
+
             for child in rawParagraphs {
-                let html = try child.outerHtml()
-                let flatChildren = extractFlatHtmlChildren(from: html)
-                let children: [SnuNode] = flatChildren.compactMap { makeSnuNode(from: $0) }
-                let snuParagraph = SnuParagprah(children: children)
-                paragraphs.append(snuParagraph)
+                // Preserve blank lines between elements: SwiftSoup represents them as TextNode(s)
+                if let tn = child as? TextNode {
+                    let text = tn.getWholeText()
+
+                    // Count occurrences of empty lines (two consecutive newlines)
+                    let emptyBlocks = text.components(separatedBy: "\n\n").count - 1
+                    if emptyBlocks > 0 {
+                        for _ in 0..<emptyBlocks {
+                            paragraphs.append(SnuParagprah(children: []))
+                        }
+                        continue
+                    }
+
+                    // Single newline-only whitespace between blocks -> preserve a single empty paragraph
+                    if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && text.contains("\n") {
+                        paragraphs.append(SnuParagprah(children: []))
+                        continue
+                    }
+                }
+
+                // Normal element handling
+                do {
+                    let html = try child.outerHtml()
+                    let flatChildren = extractFlatHtmlChildren(from: html)
+                    let children: [SnuNode] = flatChildren.compactMap { makeSnuNode(from: $0) }
+                    let snuParagraph = SnuParagprah(children: children)
+                    paragraphs.append(snuParagraph)
+                } catch {
+                    continue
+                }
             }
-            
-            return paragraphs.filter { $0.children.isEmpty == false }
+
+            // Preserve empty paragraphs to keep visual blank lines
+            return paragraphs
 
         } catch {
             return []
@@ -41,6 +67,23 @@ struct SnudownExtractor {
     
     private static func elementToNode(_ element: Element) -> HtmlElement? {
         let tagName = element.tag().getName()
+        
+        // Special-case: traverse <pre> to reach nested <code> produced by fenced code blocks
+        if tagName == "pre" {
+            // If there is a <code> child, extract its raw text content preserving newlines
+            for child in element.children() {
+                if child.tag().getName() == "code" {
+                    // Preserve newlines by concatenating text nodes without normalization
+                    let textNodes = child.textNodes()
+                    let codeText = textNodes.map { $0.getWholeText() }.joined()
+                    return HtmlElement(type: .code, inside: codeText)
+                }
+            }
+            // Fallback: concatenate all text nodes under <pre>
+            let textNodes = element.textNodes()
+            let codeText = textNodes.map { $0.getWholeText() }.joined()
+            return HtmlElement(type: .code, inside: codeText)
+        }
         
         if let htmlType = HtmlType.fromString(tagName) {
             var children: [HtmlElement] = []
@@ -71,7 +114,7 @@ struct SnudownExtractor {
         do {
             let doc = try SwiftSoup.parseBodyFragment(paragraphString)
             if let body = doc.body(){
-                for element in body.children().filter({ $0.hasText() }) {
+                for element in body.children() {
                     if let node = elementToNode(element) {
                         children.append(node)
                     }
@@ -94,7 +137,14 @@ struct SnudownExtractor {
     private static func makeSnuNode(from htmlElement: HtmlElement) -> SnuNode {
         switch htmlElement.type {
         case .p:
-            return SnuTextNode(insideText: htmlElement.inside, children: snuNodeChildren(htmlElement.children))
+            // If this paragraph has child elements (e.g., <code>, <strong>, etc.),
+            // avoid duplicating their text by clearing the parent insideText and
+            // letting children render their own content.
+            if let children = htmlElement.children, children.isEmpty == false {
+                return SnuTextNode(insideText: "", children: snuNodeChildren(children))
+            } else {
+                return SnuTextNode(insideText: htmlElement.inside, children: [])
+            }
         case .spoiler:
             return SnuSpoilerNode(insideText: htmlElement.inside, children: snuNodeChildren(htmlElement.children))
         case .bold:
@@ -106,7 +156,12 @@ struct SnudownExtractor {
         case .a:
             return SnuLinkNode(linkHref: htmlElement.inside, children: snuNodeChildren(htmlElement.children))
         case .code:
-            return SnuCodeBlock(children: [], insideText: htmlElement.inside)
+            // Heuristic: block code (from <pre><code>...</code></pre>) usually contains newlines
+            if htmlElement.inside.contains("\n") {
+                return SnuCodeBlock(children: [], insideText: htmlElement.inside)
+            } else {
+                return SnuInlineCode(insideText: htmlElement.inside)
+            }
         case .h1:
             return SnuHeaderNode(insideText: htmlElement.inside, headingLevel: .h1, children: snuNodeChildren(htmlElement.children))
         case .h2:
@@ -157,3 +212,4 @@ struct SnudownExtractor {
         return SnuTextNode(insideText: "", children: [])
     }
 }
+

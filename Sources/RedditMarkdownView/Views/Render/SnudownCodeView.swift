@@ -1,23 +1,29 @@
 //
 //  SnudownCodeView.swift
-//  
+//
 //
 //  Created by Tom Knighton on 10/09/2023.
 //
 
-import SwiftUI
 import Highlightr
+import SwiftUI
+import snudown
 
 struct SnudownCodeView: View {
-    
+
     @Environment(\.colorScheme) private var scheme
-    
+
     let code: SnuCodeBlock
     private let highlightr = Highlightr()
-    
+
     @State private var attributedCode: NSAttributedString? = nil
     @State private var copied: Bool = false
-        
+
+    // Determine if this is a code block (multi-line) or inline code (single-line)
+    private var isCodeBlock: Bool {
+        code.insideText.contains("\n")
+    }
+
     var body: some View {
         ZStack(alignment: .top) {
             Group {
@@ -29,23 +35,35 @@ struct SnudownCodeView: View {
             }
             .lineSpacing(5)
             .padding(4)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(Color(.systemGray6), in: .rect(cornerRadius: 8))
         .task(priority: .background) {
-            let lines = self.code.insideText.split(separator: "\n").prefix(2)
-            var languageToCheck = ""
-            if self.code.insideText.hasPrefix("\n") {
-                languageToCheck = lines[1].lowercased()
-            } else {
-                languageToCheck = lines[0].lowercased()
-            }
-            
-            let language = highlightr?.supportedLanguages().first(where: { $0 == languageToCheck })
             var text = self.code.insideText
-            if language != nil {
-                text = self.code.insideText.split(separator: "\n").dropFirst().joined(separator: "\n")
+            var language: String? = nil
+
+            // Only try to detect language for code blocks, not inline code
+            if isCodeBlock {
+                let lines = self.code.insideText.split(separator: "\n", omittingEmptySubsequences: false)
+
+                // Check if first non-empty line is a language identifier
+                if let firstNonEmptyLine = lines.first(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty }) {
+                    let potentialLanguage = firstNonEmptyLine.trimmingCharacters(in: .whitespaces).lowercased()
+
+                    if let supportedLanguage = highlightr?.supportedLanguages().first(where: { $0 == potentialLanguage }
+                    ) {
+                        language = supportedLanguage
+
+                        // Find the index of the language line and drop everything up to and including it
+                        if let langIndex = lines.firstIndex(where: {
+                            $0.trimmingCharacters(in: .whitespaces).lowercased() == potentialLanguage
+                        }) {
+                            text = lines.dropFirst(langIndex + 1).joined(separator: "\n")
+                        }
+                    }
+                }
             }
-            
+
             highlightr?.setTheme(to: self.scheme == .dark ? "xcode-dark" : "xcode")
             attributedCode = highlightr?.highlight(text, as: language)
         }
@@ -58,7 +76,21 @@ struct SnudownCodeView: View {
 #Preview {
     ScrollView {
         VStack {
-            SnudownView(text: "This is a ```import inlineCode```")
+            SnudownView(
+                text: """
+                    This is a
+                    ```
+                    import inlineCode
+                    
+                    struct Snu: View {
+                        var body: some View {
+                            /// code here
+                            }
+                    }
+                    ```
+                    And this is `inline code`
+                    """
+            )
         }
         .padding()
     }
