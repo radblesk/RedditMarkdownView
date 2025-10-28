@@ -28,41 +28,9 @@ struct SnudownCodeView: View {
                 }
             }
             .lineSpacing(5)
-            .padding()
-            .frame(maxWidth: .infinity, alignment: .leading)
-                
-            HStack(alignment: .top) {
-                Spacer()
-                Button(action: { self.copyCode() }) {
-                    HStack {
-                        Image(systemName: "doc.on.clipboard")
-                            .frame(width: 18, height: 18)
-                            .padding(8)
-                            .contentShape(.rect())
-                        if copied {
-                            Image(systemName: "checkmark")
-                                .frame(width: 18, height: 18)
-                                .padding(8)
-                                .contentShape(.rect())
-                                .transition(.push(from: .trailing))
-                        }
-                    }
-                }
-                .foregroundStyle(.primary)
-                .background(
-                    .quaternary.opacity(0.2),
-                    in: RoundedRectangle(cornerRadius: 5, style: .continuous)
-                )
-                .overlay {
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .stroke(.quaternary, lineWidth: 1)
-                }
-                .buttonStyle(.borderless)
-                Spacer().frame(width: 6)
-            }
-            .padding(6)
+            .padding(4)
         }
-        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+        .background(Color(.systemGray6), in: .rect(cornerRadius: 8))
         .task(priority: .background) {
             let lines = self.code.insideText.split(separator: "\n").prefix(2)
             var languageToCheck = ""
@@ -78,31 +46,20 @@ struct SnudownCodeView: View {
                 text = self.code.insideText.split(separator: "\n").dropFirst().joined(separator: "\n")
             }
             
-            highlightr?.setTheme(to: self.scheme == .dark ? "dark" : "s")
+            highlightr?.setTheme(to: self.scheme == .dark ? "xcode-dark" : "xcode")
             attributedCode = highlightr?.highlight(text, as: language)
         }
         .onChange(of: self.scheme) { newValue in
-            self.highlightr?.setTheme(to: newValue == .dark ? "dark" : "xcode")
+            self.highlightr?.setTheme(to: newValue == .dark ? "xcode-dark" : "xcode")
         }
     }
-    
-    private func copyCode() {
-        #if os(macOS)
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(self.code.insideText, forType: .string)
-        #else
-        UIPasteboard.general.string = self.code.insideText
-        #endif
-        
-        Task {
-            withAnimation(.spring(duration: 0.3)) {
-                self.copied = true
-            }
-            
-            try await Task.sleep(nanoseconds: 1_000_000_000)
-            withAnimation(.spring(duration: 0.3)) {
-                self.copied = false
-            }
+}
+
+#Preview {
+    ScrollView {
+        VStack {
+            SnudownView(text: "This is a ```import inlineCode```")
         }
+        .padding()
     }
 }
