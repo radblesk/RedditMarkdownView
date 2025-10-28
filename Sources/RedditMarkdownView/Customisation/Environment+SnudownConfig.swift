@@ -26,7 +26,7 @@ public extension EnvironmentValues {
     
     @Entry var snuDisplayInlineImages: Bool = true
     @Entry var snuInlineImageWidth: CGFloat = 50
-    @Entry var snuInlineImageShowLink: Bool = false
+    @Entry var snuInlineImageShowLink: Bool = true
     @Entry var snuMaxCharacters: Int? = nil
     @Entry var snuHideTables: Bool = false
 }
