@@ -290,6 +290,7 @@ struct InlineRemoteImageView: View {
                     }
                     .buttonStyle(.plain)
                     .glassEffect(.regular.interactive(), in: .circle)
+                    .contentShape(.circle)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                 .padding()
