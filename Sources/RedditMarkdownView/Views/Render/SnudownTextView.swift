@@ -16,8 +16,6 @@ struct SnudownTextView: View {
     @Environment(\.snuInlineImageWidth) private var imageWidth
     @Environment(\.snuInlineImageShowLink) private var showInlineImageLinks
     
-    @State private var result: AnyView? = nil
-    
     let node: SnuTextNode
     private var font: Font?
     
@@ -27,26 +25,15 @@ struct SnudownTextView: View {
     }
     
     var body: some View {
-        Group {
-            if let result {
-                result
-                    .foregroundColor(textColor)
-                    .tint(linkColor)
-            } else {
-                ProgressView()
-            }
-        }
-        .task {
-            if result == nil {
-                self.result = await buildView(for: node)
-            }
-        }
+        buildView(for: node)
+            .foregroundColor(textColor)
+            .tint(linkColor)
     }
     
-    // MARK: - Builders
+    // MARK: - Builders (sync text, async images)
     
-    private func buildView(for node: SnuTextNode) async -> AnyView {
-        // If this node is a link, render image when it's an image URL; otherwise render as text.
+    private func buildView(for node: SnuTextNode) -> AnyView {
+        // Links: render as image if URL is an image; otherwise render link text
         if let link = node as? SnuLinkNode {
             let href = link.linkHref.trimmingCharacters(in: .whitespacesAndNewlines)
             if displayImages, isImageURL(href) {
@@ -60,9 +47,10 @@ struct SnudownTextView: View {
                     .font(font ?? defaultFont)
                 )
             } else {
-                let text = link.contentAsCMark(loadImages: false, imageWidth: imageWidth, showLink: showInlineImageLinks)
-                    .font(font ?? defaultFont)
-                return AnyView(text)
+                return AnyView(
+                    link.contentAsCMark(loadImages: false, imageWidth: imageWidth, showLink: showInlineImageLinks)
+                        .font(font ?? defaultFont)
+                )
             }
         }
         
@@ -71,26 +59,28 @@ struct SnudownTextView: View {
         if childNodes.isEmpty {
             var t = node.insideText
             if t.hasSuffix("\n") { t.removeLast() }
-            let text = Text(t)
-                .snuTextDecoration(node.decoration, font: font ?? defaultFont)
-                .font(font ?? defaultFont)
-            return AnyView(text)
+            return AnyView(
+                Text(t)
+                    .snuTextDecoration(node.decoration, font: font ?? defaultFont)
+                    .font(font ?? defaultFont)
+            )
         } else {
             // If no image links anywhere, build a single Text for perfect wrapping.
             let hasImage = displayImages && childNodes.contains { n in
-                if let l = n as? SnuLinkNode {
-                    return isImageURL(l.linkHref.trimmingCharacters(in: .whitespacesAndNewlines))
-                }
-                return false
+                guard let l = n as? SnuLinkNode else { return false }
+                return isImageURL(l.linkHref.trimmingCharacters(in: .whitespacesAndNewlines))
             }
             
             if !hasImage {
-                let text: Text = await childNodes.asyncReduce(Text("")) { acc, child in
-                    let piece = await buildText(for: child).snuTextDecoration(child.decoration, font: font ?? defaultFont)
+                let text: Text = childNodes.reduce(Text("")) { acc, child in
+                    let piece = buildText(for: child).snuTextDecoration(child.decoration, font: font ?? defaultFont)
                     return Text("\(acc)\(piece)")
                 }
-                let decorated = text.snuTextDecoration(node.decoration, font: font ?? defaultFont)
-                return AnyView(decorated.font(font ?? defaultFont))
+                return AnyView(
+                    text
+                        .snuTextDecoration(node.decoration, font: font ?? defaultFont)
+                        .font(font ?? defaultFont)
+                )
             }
             
             // Mixed path: interleave image views and collapsed text segments.
@@ -123,7 +113,7 @@ struct SnudownTextView: View {
                         continue
                     }
                 }
-                let piece = await buildText(for: child).snuTextDecoration(child.decoration, font: font ?? defaultFont)
+                let piece = buildText(for: child).snuTextDecoration(child.decoration, font: font ?? defaultFont)
                 buffer.append(piece)
             }
             flushBuffer()
@@ -139,7 +129,7 @@ struct SnudownTextView: View {
         }
     }
     
-    private func buildText(for node: SnuTextNode) async -> Text {
+    private func buildText(for node: SnuTextNode) -> Text {
         if let link = node as? SnuLinkNode {
             return link.contentAsCMark(loadImages: false, imageWidth: imageWidth, showLink: showInlineImageLinks)
                 .font(font ?? defaultFont)
@@ -150,8 +140,8 @@ struct SnudownTextView: View {
             if t.hasSuffix("\n") { t.removeLast() }
             return Text(t).font(font ?? defaultFont)
         } else {
-            return await children.asyncReduce(Text("")) { acc, child in
-                let piece = await buildText(for: child).snuTextDecoration(child.decoration, font: font ?? defaultFont)
+            return children.reduce(Text("")) { acc, child in
+                let piece = buildText(for: child).snuTextDecoration(child.decoration, font: font ?? defaultFont)
                 return Text("\(acc)\(piece)")
             }
             .font(font ?? defaultFont)
@@ -239,22 +229,7 @@ extension SnuTextNode {
     }
 }
 
-// MARK: - Async reduce
-
-public extension Sequence {
-    func asyncReduce<Result>(
-        _ initialResult: Result,
-        _ nextPartialResult: ((Result, Element) async throws -> Result)
-    ) async rethrows -> Result {
-        var result = initialResult
-        for element in self {
-            result = try await nextPartialResult(result, element)
-        }
-        return result
-    }
-}
-
-// MARK: - Inline image view
+// MARK: - Inline image view (async fetch)
 
 struct InlineRemoteImageView: View {
     let urlString: String
@@ -285,7 +260,10 @@ struct InlineRemoteImageView: View {
                     Text(LocalizedStringKey(linkText))
                 }
             } else {
-                Text(LocalizedStringKey(linkText))
+                // Text is already rendered above; while loading, keep layout stable with caption if desired
+                if showLink {
+                    Text(LocalizedStringKey(linkText))
+                }
             }
         }
         .task(id: urlString) { await loadImage() }
@@ -321,22 +299,20 @@ struct InlineRemoteImageView: View {
     }
     
     @MainActor
-    private func setImage(_ image: UIImage?) {
-        self.uiImage = image
-    }
+    private func setImage(_ image: UIImage?) { self.uiImage = image }
     
     private func loadImage() async {
         guard let url = URL(string: urlString) else { return }
-        // Respect imageWidth only if you want server-side resizing; here we fetch original.
         let request = ImageRequest(url: url)
         do {
             let image: UIImage = try await ImagePipeline.shared.image(for: request)
             setImage(image)
         } catch {
-            // Fallback: caption only
+            // ignore; caption (if any) remains
         }
     }
 }
+
 
 
 #Preview {
@@ -380,7 +356,7 @@ struct InlineRemoteImageView: View {
     let nonWorkingExample =
         "Can someone help me understand why Pauldies profiled the case of [Richard Hess](https://www.youtube.com/watch?v=uphicFoTBFM) beginning at 6:57? "
     ScrollView {
-        SnudownView(text: nonWorkingExample)
+        SnudownView(text: exampleMarkdown)
     }
     .padding(.horizontal, 8)
     .background { Color(uiColor: .tertiarySystemBackground).ignoresSafeArea() }
